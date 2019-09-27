@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"encoding/base64"
 	"fmt"
+	"math/rand"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/valyala/fasthttp"
@@ -171,7 +173,29 @@ func NewTitle(title string) string {
 	return result
 }
 
-func RepoFindTracks(encodedUrl string) (Tracks, error) {
+func RepoGetRandomAlbum() (Album, error) {
+	rand.Seed(time.Now().UnixNano())
+	s := RandString()
+	albums, _ := RepoGetLetterSearch(s)
+	i := RandInt(0, len(albums))
+	album, _ := RepoFindTracks(albums[i].Id)
+	return album, nil
+}
+
+func RandString() string {
+	const letterBytes = "ABCDEFGHIJKLMNOPQRSTUVWXYZ#"
+    b := make([]byte, 1)
+    for i := range b {
+        b[i] = letterBytes[rand.Intn(len(letterBytes))]
+    }
+    return string(b)
+}
+
+func RandInt(min, max int) int {
+	return min + rand.Intn(max-min)
+}
+
+func RepoFindTracks(encodedUrl string) (Album, error) {
 	tracks = nil
 	req := fasthttp.AcquireRequest()
 	res := fasthttp.AcquireResponse()
@@ -183,24 +207,31 @@ func RepoFindTracks(encodedUrl string) (Tracks, error) {
 	req.SetRequestURI(url)
 
 	if err := fasthttp.Do(req, res); err != nil {
-		return nil, err
+		return Album{}, err
 	}
 
 	// Load the HTML document
 	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(res.Body()))
 	if err != nil {
-		return nil, err
+		return Album{}, err
 	}
 	var index int
 
-	//checking if there is a column entitled "Track"
-	//if there is, then 3 is the correct index for retrieving title and duration
-	//if not, 2 is correct
-	if doc.Find("#songlist_header > th:nth-child(2) > b").Eq(0).Text() == "Track" {
+	// checking if there is a column entitled "Track" or "CD"
+	// if there is a CD then it goes 'Play | CD | Track | Song Name | Duration | MP3'
+	// if there is only a column named Track then it's 'Play | Track | Song Name | Duration | MP3'
+	// if neither than 'Play | Song Name | Duration | MP3'
+	// index checks for where to start looking for the track names
+	if doc.Find("#songlist_header > th:nth-child(2) > b").Eq(0).Text() == "CD" {
+		index = 4
+	} else if doc.Find("#songlist_header > th:nth-child(2) > b").Eq(0).Text() == "Track" {
 		index = 3
 	} else {
 		index = 2
 	}
+
+	albumTitle := doc.Find("#EchoTopic > h2").Eq(0).Text()
+	albumDuration := doc.Find("#songlist_footer > th:nth-child(2) > b").Eq(0).Text()
 
 	var durations []string
 
@@ -225,7 +256,9 @@ func RepoFindTracks(encodedUrl string) (Tracks, error) {
 		}
 	})
 
-	return tracks, nil
+	album := Album{Title: albumTitle, Duration: albumDuration, Tracks: tracks}
+
+	return album, nil
 }
 
 func RepoCreateTrack(t Track) Track {

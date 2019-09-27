@@ -31,13 +31,13 @@ func GetAlbum(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	var query string = vars["albumTitle"]
 	var err error
-	tracks, err := RepoFindTracks(query)
+	album, err := RepoFindTracks(query)
 	if err != nil {
 		panic(err)
 	}
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(tracks); err != nil {
+	if err := json.NewEncoder(w).Encode(album); err != nil {
 		panic(err)
 	}
 }
@@ -84,6 +84,20 @@ func GetDownloadTrackLink(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(link); err != nil {
+		panic(err)
+	}
+}
+
+
+func GetRandomAlbum(w http.ResponseWriter, r *http.Request) {
+	var err error
+	tracks, err := RepoGetRandomAlbum()
+	if err != nil {
+		panic(err)
+	}
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(tracks); err != nil {
 		panic(err)
 	}
 }
